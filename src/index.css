@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+body {
+  background-color: #f1f5f9;
+  margin: 0;
+  overflow-x: hidden;
+}
+
+/* UI/UX MOTION ENGINE */
+
+/* Smooth organic drifting for background ambient elements */
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0px) scale(1) rotate(0deg); }
+  50% { transform: translateY(-30px) scale(1.08) rotate(5deg); }
+}
+
+@keyframes float-reverse {
+  0%, 100% { transform: translateY(0px) scale(1.05) rotate(0deg); }
+  50% { transform: translateY(25px) scale(0.95) rotate(-5deg); }
+}
+
+/* Flawless, gapless marquee scrolling */
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-float-1 {
+  animation: float-slow 10s ease-in-out infinite;
+}
+
+.animate-float-2 {
+  animation: float-reverse 14s ease-in-out infinite;
+}
+
+.animate-marquee {
+  animation: marquee 25s linear infinite;
+}
