@@ -2,15 +2,28 @@ import { useState, useEffect } from 'react';
 import { collection, query, orderBy, limit, onSnapshot, where, doc } from "firebase/firestore";
 import { db } from '../firebase.js';
 import { FaTrophy, FaDownload, FaGraduationCap } from 'react-icons/fa';
+import Confetti from 'react-confetti';
 
 export default function Leaderboard() {
   const [leaders, setLeaders] = useState([]);
   const [isEventEnded, setIsEventEnded] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   
+  // Track window size for the confetti canvas
+  const [windowSize, setWindowSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
+  
   const currentPlayer = localStorage.getItem('swudevs_player_name');
 
   useEffect(() => {
+    // Listen to window resizes so confetti fits perfectly
+    const handleResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', handleResize);
+
     const q = query(collection(db, "participants"), where("wpm", ">", 0), orderBy("wpm", "desc"), limit(10));
     const unsubLeaders = onSnapshot(q, (snapshot) => {
       let fetchedLeaders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -22,14 +35,19 @@ export default function Leaderboard() {
       if (docSnap.exists()) setIsEventEnded(docSnap.data().isEnded);
     });
     
-    return () => { unsubLeaders(); unsubEvent(); };
+    return () => { 
+      unsubLeaders(); 
+      unsubEvent(); 
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
   const currentPlayerIndex = leaders.findIndex(player => player.name === currentPlayer);
   const currentPlayerData = currentPlayerIndex !== -1 ? leaders[currentPlayerIndex] : null;
   const isCurrentUserTop3 = currentPlayerIndex !== -1 && currentPlayerIndex < 3;
   
-  const showGoodLuckMessage = isEventEnded && currentPlayer && !isCurrentUserTop3;
+  // THE FIX: Now this message shows for EVERYONE as long as the event is ended!
+  const showGoodLuckMessage = isEventEnded && currentPlayer;
 
   const generateCertificate = (name) => {
     setIsDownloading(true);
@@ -63,14 +81,12 @@ export default function Leaderboard() {
     return "bg-slate-100 border-slate-200 text-slate-500 font-black";
   };
 
-  // Renders a single clean player row with precise spacing
   const renderPlayerCard = (player, index) => {
     if (!player) return null;
     return (
       <div key={player.id} className={`flex flex-col p-3.5 sm:p-4 rounded-2xl border transition-all duration-300 ${index < 3 ? 'bg-red-50/60 border-red-100/80 shadow-sm' : 'bg-white border-slate-100 shadow-sm'}`}>
         <div className="flex items-center justify-between w-full gap-2">
           
-          {/* Left: Rank badge & Name */}
           <div className="flex items-center gap-3 min-w-0">
             <div className={`w-9 h-9 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center rounded-xl border-2 font-black text-sm sm:text-base ${getRankStyle(index)}`}>
               {index < 3 ? <FaTrophy className="text-sm sm:text-base" /> : index + 1}
@@ -80,7 +96,6 @@ export default function Leaderboard() {
             </span>
           </div>
 
-          {/* Right: Cleanly spaced Stats numbers */}
           <div className="flex items-center gap-4 sm:gap-6 shrink-0">
             <div className="text-center min-w-[42px]">
               <p className="text-[9px] font-black tracking-wider text-slate-400 uppercase mb-0.5 leading-none">WPM</p>
@@ -107,60 +122,71 @@ export default function Leaderboard() {
   };
 
   return (
-    <div className="w-full max-w-xl p-4 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] bg-white/70 backdrop-blur-xl border border-white shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)]">
-      
-      {/* PERSONALIZED GOOD LUCK MESSAGE FOR NON-WINNERS */}
-      {showGoodLuckMessage && (
-        <div className="mb-6 p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 shadow-xl">
-          <div className="flex flex-col items-center text-center gap-2.5">
-            <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center mb-1">
-              <FaGraduationCap className="text-2xl text-amber-400" />
-            </div>
-            <h2 className="text-lg sm:text-2xl font-black text-white tracking-wide">
-              Great run, {currentPlayer}!
-            </h2>
-            <p className="text-xs sm:text-base text-slate-300 font-medium leading-relaxed max-w-sm">
-              You crushed it in the Arena. The SWUdevs team wishes you the absolute best of luck as you start your 1st year of college. Keep chipping those keys!
-            </p>
-          </div>
-        </div>
+    <>
+      {/* 🎊 NEW CONFETTI COMPONENT FOR THE TOP 3 WINNERS 🎊 */}
+      {isEventEnded && isCurrentUserTop3 && (
+        <Confetti 
+          width={windowSize.width} 
+          height={windowSize.height} 
+          recycle={false} 
+          numberOfPieces={800} 
+          gravity={0.15}
+          style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, pointerEvents: 'none' }}
+        />
       )}
 
-      {/* FIXED TITLE WRAPPING REGION */}
-      <div className="text-center mb-6">
-        <div className="flex items-center justify-center gap-2 font-black text-slate-900 tracking-tight uppercase">
-          <span className="text-lg sm:text-2xl shrink-0">⚡</span>
-          <h1 className="text-lg sm:text-2xl md:text-3xl whitespace-nowrap">
-            {isEventEnded && currentPlayerData ? "YOUR PLACEMENT" : "ARENA RANKINGS"}
-          </h1>
-          <span className="text-lg sm:text-2xl shrink-0">⚡</span>
-        </div>
-        {isEventEnded && isCurrentUserTop3 && (
-          <p className="text-red-600 font-black text-xs sm:text-sm uppercase tracking-widest mt-1.5 animate-bounce">🏆 Top 3 Finisher! 🏆</p>
-        )}
-      </div>
-
-      {/* CORE CONTENTS */}
-      {isEventEnded ? (
-        currentPlayerData ? (
-          <div className="flex flex-col gap-3">
-            {renderPlayerCard(currentPlayerData, currentPlayerIndex)}
+      <div className="w-full max-w-xl p-4 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] bg-white/70 backdrop-blur-xl border border-white shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)]">
+        
+        {/* PERSONALIZED GOOD LUCK MESSAGE FOR EVERYONE */}
+        {showGoodLuckMessage && (
+          <div className="mb-6 p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 shadow-xl">
+            <div className="flex flex-col items-center text-center gap-2.5">
+              <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center mb-1">
+                <FaGraduationCap className="text-2xl text-amber-400" />
+              </div>
+              <h2 className="text-lg sm:text-2xl font-black text-white tracking-wide">
+                Great run, {currentPlayer}!
+              </h2>
+              <p className="text-xs sm:text-base text-slate-300 font-medium leading-relaxed max-w-sm">
+                You crushed it in the Arena. The SWUdevs team wishes you the absolute best of luck as you start your 1st year of college. Keep chipping those keys!
+              </p>
+            </div>
           </div>
-        ) : null
-      ) : (
-        <div>
-          {leaders.length === 0 ? (
-            <div className="text-center py-6">
-              <p className="text-slate-400 font-bold animate-pulse text-sm sm:text-base tracking-wider">WAITING FOR THE FIRST CHALLENGER...</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2.5">
-              {leaders.map((player, index) => renderPlayerCard(player, index))}
-            </div>
+        )}
+
+        <div className="text-center mb-6">
+          <div className="flex items-center justify-center gap-2 font-black text-slate-900 tracking-tight uppercase">
+            <span className="text-lg sm:text-2xl shrink-0">⚡</span>
+            <h1 className="text-lg sm:text-2xl md:text-3xl whitespace-nowrap">
+              {isEventEnded && currentPlayerData ? "YOUR PLACEMENT" : "ARENA RANKINGS"}
+            </h1>
+            <span className="text-lg sm:text-2xl shrink-0">⚡</span>
+          </div>
+          {isEventEnded && isCurrentUserTop3 && (
+            <p className="text-red-600 font-black text-xs sm:text-sm uppercase tracking-widest mt-1.5 animate-bounce">🏆 Top 3 Finisher! 🏆</p>
           )}
         </div>
-      )}
-      
-    </div>
+
+        {isEventEnded ? (
+          currentPlayerData ? (
+            <div className="flex flex-col gap-3">
+              {renderPlayerCard(currentPlayerData, currentPlayerIndex)}
+            </div>
+          ) : null
+        ) : (
+          <div>
+            {leaders.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-slate-400 font-bold animate-pulse text-sm sm:text-base tracking-wider">WAITING FOR THE FIRST CHALLENGER...</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {leaders.map((player, index) => renderPlayerCard(player, index))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
